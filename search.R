@@ -31,8 +31,7 @@
 #'
 
 search <- function(string, recursive = TRUE, silent = T, case.sensitive = F,
-                   target = "E:/Toolbox/CodeDatabase/QCPfunc_Dev/QCPfunc"
-                   ){
+                   target = "package"){
 
   data = vector()
   files = list.files(target, recursive = T, full.names = T)
