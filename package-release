@@ -1,0 +1,116 @@
+# Main function for releasing of new version
+
+#' @title releasePackage
+#' @description Main function for releasing a brand new package. It will execute
+#' the following steps: 1) validate format of description file; 2) check if tests
+#' has been run recently; 3) Display some information and asks user to verify
+#' that a package should be released. Finally, it build a package.
+#' @param ver String. which version should be released? E.g. "2.3.1" or "test".
+#' @param install. Should pacakge be installed to destination folder?
+#' @param document. Runs the command devtools::document() generating namespace.
+#' @param r.version what r-version is allowed to be used? Default is 3.2.3. Manipulating this string may have
+#' severe consequences for the release of the package.
+#' @param r.architecture what r-version architecture should be used? Default is x86 (32 bit). Changing this
+#' may impact what packages that can be used.
+#' @param force. Boolean indicating whether all custom checks and user confirmations should be skipped
+#' @author FRHL
+#' @export
+
+ReleasePackage <- function(ver="test", package = "myfunc", r.version = "3.2.3",
+                           r.architecture = "x86", install = FALSE, document=TRUE,
+                           force.release = FALSE, debug = F, do.icon = T, verbose = T){
+
+  if (debug) browser()
+  
+  
+  require(devtools)
+
+  ### Need to source untill we install this package ###
+  # rm 
+  # rm
+  # rm
+
+  # Assign folders to dev and release
+  target.dev=""
+  all.releases <- ""
+  target.release=file.path(all.releases, paste0("Ver_",ver))
+  setwd(target.dev)
+
+  # Force skip checks
+  if (!force.release){
+
+    ### Check R-version and architecture
+    if (verbose) cat("\n* Checking R-Architecture and R-version.. ")
+    r.current <- paste(R.version$major, R.version$minor, sep = ".") #version
+    r.current.architecture <- Sys.info()[["machine"]] #architecture
+    #if (!r.architecture %in% c("x86", "x86-64")) stop("x86 and x86-64 are the only allowed R-architectures!")
+    if (r.architecture %nin% c("x86", "x86-64"))
+      stop(paste0("R-architecture bin 'x86' or 'x86-64' was expected. Found architecture: '",r.current.architecture),"'")
+    if (r.version != r.current)
+      stop(paste("R-version",r.version,"was exepcted. Found version:", r.current))
+    if (verbose) cat("OK!\n")
+
+    ### check that myfunc is formatted correctly, and ASK if myfunc should be released.
+    description.version = checkPackage(target.dev, target.release, ver, package = package,
+                                       checks=c("DESCRIPTION", "SIZE", "VERSIONS", "LOGS", "EXPORT"),
+                                       verbose = verbose)
+    ### Document
+    if (document) devtools::document()
+  }
+
+  # Make a copy of myfunc (i.e. myfunc_source) # Test might have to be deleted manually
+  if (ver=="test"){if (file.exists(target.release)){unlink(target.release,recursive = TRUE)}}
+  dir.create(target.release)
+  copyFolders(target.dev, target.release, verbose = T)
+
+  file.rename(paste(target.release,"/",package,sep=""), paste(target.release,"/",package,"_source",sep=""))
+
+
+  # Check that files are copied
+  if (!force.release) validatePackageFiles(target.dev,target.release)
+
+  # Remove redundant files
+  if (verbose) write("* Copy finished. Deleting extra files.. !", stdout())
+
+  newTarget=paste(target.release,"/",package,"_source",sep="")
+  projTarget = paste(newTarget,"/",package,".Rproj",sep="")
+
+  if (file.exists(projTarget)) {file.remove(projTarget)}
+  else {
+    write("\n* WARNING: Possible Error -  expected .proj but it wasnt found!", stderr())
+    Sys.sleep(3)
+    }
+
+  # Build package
+  setwd(target.release)
+  if (verbose) write("\n* Building source package..", stdout())
+  devtools::build(paste(package,"_source",sep=""))
+
+  # Install pacakge
+  if (install){
+
+    if (verbose) write("\n* Installing package to folder..", stdout())
+    # Paths must be renamed when releaseing a test
+    if (ver == "test")
+      {path.tar.gz = paste0(target.release,"/", package,"_",description.version,".tar.gz")}
+    else
+      {path.tar.gz = paste0(target.release,"/",package,"_", ver,".tar.gz")}
+
+    #  If the tar.gz file exists
+    if (file.exists(path.tar.gz)){
+
+      # Unpack and install to folder
+      install.packages(path.tar.gz, repos = NULL, type="source",lib=target.release)
+      if (verbose) write("\n* Installing package to folder.. OK!", stdout())
+
+    }else{
+      warning("Source was released, but Installation of package failed: Invalid location of tar.gz file!")
+    }
+  }
+
+  # Succes
+  if (verbose) write(paste0("\n* Succes! ",package," 'ver_",ver,"' was released!"), stderr())
+  setwd(target.dev)
+  return(invisible(NULL))
+}
+
